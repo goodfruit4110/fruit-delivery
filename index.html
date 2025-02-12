@@ -40,12 +40,12 @@
     <p id="status"></p>
     
     <script>
+        let audioContext;
         let mediaRecorder;
         let audioChunks = [];
         let isRecording = false;
         let timerInterval;
         let seconds = 0;
-        let currentStream;
         
         function startTimer() {
             seconds = 0;
@@ -61,45 +61,40 @@
             document.getElementById("timer").textContent = "";
         }
         
-        function stopMediaTracks(stream) {
-            stream.getTracks().forEach(track => track.stop());
-        }
-        
         document.getElementById("recordButton").addEventListener("click", async function() {
             if (!isRecording) {
                 try {
-                    if (!navigator.mediaDevices?.getUserMedia) {
-                        alert("브라우저가 마이크 접근을 지원하지 않습니다.");
-                        return;
-                    }
-                    if (currentStream) stopMediaTracks(currentStream);
-                    
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    currentStream = stream;
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const source = audioContext.createMediaStreamSource(stream);
+                    
                     mediaRecorder = new MediaRecorder(stream);
                     audioChunks = [];
+                    
                     mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
-                    mediaRecorder.onstop = () => {
+                    mediaRecorder.onstop = async () => {
                         const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
                         const audioUrl = URL.createObjectURL(audioBlob);
+                        
                         const audioPlayer = document.getElementById("audioPlayer");
+                        if (audioPlayer.src) {
+                            URL.revokeObjectURL(audioPlayer.src);
+                        }
                         audioPlayer.src = audioUrl;
                         audioPlayer.style.display = "block";
                         audioPlayer.play();
                     };
+                    
                     mediaRecorder.start();
                     startTimer();
                     isRecording = true;
                     this.textContent = "녹음 중지";
                     this.classList.add("recording");
                 } catch (error) {
-                    alert("마이크 권한을 허용해주세요.");
+                    alert("마이크 접근을 허용해주세요.");
                 }
             } else {
-                if (mediaRecorder) {
-                    mediaRecorder.stop();
-                    stopMediaTracks(currentStream);
-                }
+                mediaRecorder.stop();
                 stopTimer();
                 isRecording = false;
                 this.textContent = "녹음 시작";
@@ -114,9 +109,13 @@
                     alert("파일 크기가 5MB를 초과할 수 없습니다.");
                     return;
                 }
+                
                 document.getElementById("fileName").textContent = "파일 선택됨: " + file.name;
-                const audioUrl = URL.createObjectURL(file);
                 const audioPlayer = document.getElementById("audioPlayer");
+                if (audioPlayer.src) {
+                    URL.revokeObjectURL(audioPlayer.src);
+                }
+                const audioUrl = URL.createObjectURL(file);
                 audioPlayer.src = audioUrl;
                 audioPlayer.style.display = "block";
                 audioPlayer.play();

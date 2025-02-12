@@ -3,67 +3,168 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>과일 정기배송 환영 페이지</title>
+    <title>음성 메시지 녹음</title>
     <style>
         body {
-            font-family: 'Pretendard', sans-serif;
-            margin: 0;
-            padding: 0;
-            min-height: 100vh;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-        .container {
+            font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
             max-width: 600px;
-            width: 90%;
-            background: white;
-            padding: 2rem;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin: 0 auto;
+            padding: 20px;
             text-align: center;
+            background-color: #f5f5f5;
         }
-        h1 {
-            color: #333;
-            margin-bottom: 1.5rem;
-            font-size: 1.8rem;
-        }
-        p {
-            color: #666;
-            line-height: 1.6;
-            margin-bottom: 2rem;
-        }
-        .form-container {
-            height: 400px;
-            overflow: hidden;
+        
+        .container {
+            background-color: white;
+            padding: 20px;
             border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
-        iframe {
-            width: 100%;
-            height: 100%;
+
+        .button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
             border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+            font-size: 16px;
         }
-        @media (max-width: 480px) {
-            .container {
-                width: 95%;
-                padding: 1rem;
-            }
+
+        .button:disabled {
+            background-color: #cccccc;
+        }
+
+        #accessCode {
+            padding: 10px;
+            font-size: 16px;
+            margin: 10px;
+            width: 100px;
+        }
+
+        #timer {
+            font-size: 20px;
+            margin: 10px;
+        }
+
+        .status {
+            color: #666;
+            margin: 10px 0;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🍎 소중한 마음을 전합니다</h1>
-        <p>
-            정성껏 준비한 과일 선물을 보내드립니다.<br>
-            아래에서 전화번호와 코드를 입력해주세요.
-        </p>
-        <div class="form-container">
-            <!-- 여기에 구글 폼 embed 코드를 넣을 예정입니다 -->
-            <iframe src="https://drive.google.com/uc?export=download&id=1i3wHBAR_BiXlxoiHZPJGsCA7TqS4gwhZ"></iframe>
+        <h1>🎤 음성 메시지 녹음</h1>
+        
+        <div id="timer">00:00</div>
+        
+        <div>
+            <button id="recordButton" class="button">녹음 시작</button>
+            <button id="stopButton" class="button" disabled>녹음 중지</button>
         </div>
+
+        <div>
+            <input type="number" id="accessCode" placeholder="액세스 코드" maxlength="4" min="0000" max="9999">
+        </div>
+
+        <div>
+            <button id="saveButton" class="button" disabled>저장하기</button>
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <audio id="audioPlayback" controls style="display: none;"></audio>
     </div>
+
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script>
+        // 여기에 YOUR_CLIENT_ID를 실제 Google Cloud Console에서 받은 클라이언트 ID로 교체하세요
+        const CLIENT_ID = 'YOUR_CLIENT_ID';
+        const API_KEY = 'YOUR_API_KEY';
+
+        let mediaRecorder;
+        let audioChunks = [];
+        let timer;
+        let seconds = 0;
+        let isRecording = false;
+
+        document.getElementById('recordButton').addEventListener('click', startRecording);
+        document.getElementById('stopButton').addEventListener('click', stopRecording);
+        document.getElementById('saveButton').addEventListener('click', saveRecording);
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    document.getElementById('audioPlayback').src = audioUrl;
+                    document.getElementById('audioPlayback').style.display = 'block';
+                    document.getElementById('saveButton').disabled = false;
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                startTimer();
+                
+                document.getElementById('recordButton').disabled = true;
+                document.getElementById('stopButton').disabled = false;
+                updateStatus('녹음 중...');
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+                updateStatus('마이크 접근 오류');
+            }
+        }
+
+        function stopRecording() {
+            mediaRecorder.stop();
+            isRecording = false;
+            stopTimer();
+            
+            document.getElementById('recordButton').disabled = false;
+            document.getElementById('stopButton').disabled = true;
+            updateStatus('녹음 완료');
+        }
+
+        function startTimer() {
+            seconds = 0;
+            timer = setInterval(() => {
+                seconds++;
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                document.getElementById('timer').textContent = 
+                    `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timer);
+        }
+
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+        }
+
+        function saveRecording() {
+            const accessCode = document.getElementById('accessCode').value;
+            if (!accessCode || accessCode.length !== 4) {
+                updateStatus('4자리 액세스 코드를 입력하세요');
+                return;
+            }
+
+            // 여기에 Google Drive 업로드 코드 구현
+            updateStatus('저장 중...');
+            // 실제 저장 로직 구현 필요
+        }
+    </script>
 </body>
 </html>

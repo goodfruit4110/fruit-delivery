@@ -4,15 +4,21 @@
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>음성 메시지 녹음</title>
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+    <!-- iOS 지원 메타 태그 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="format-detection" content="telephone=no">
+    <title>음성 메시지 녹음/업로드</title>
     <style>
         body {
-            font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+            font-family: -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
             max-width: 600px;
             margin: 0 auto;
             padding: 20px;
             text-align: center;
             background-color: #f5f5f5;
+            -webkit-tap-highlight-color: transparent;
         }
         
         .container {
@@ -31,10 +37,15 @@
             cursor: pointer;
             margin: 10px;
             font-size: 16px;
+            min-height: 44px;
         }
 
         .button:disabled {
             background-color: #cccccc;
+        }
+
+        .upload-button {
+            background-color: #2196F3;
         }
 
         #accessCode {
@@ -42,6 +53,7 @@
             font-size: 16px;
             margin: 10px;
             width: 100px;
+            min-height: 44px;
         }
 
         #timer {
@@ -53,17 +65,91 @@
             color: #666;
             margin: 10px 0;
         }
+
+        .file-upload-box {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        /* 모바일 최적화 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+                margin: 10px;
+            }
+            
+            .button {
+                width: 80%;
+                margin: 8px auto;
+                display: block;
+            }
+
+            .file-upload-box {
+                margin: 10px 0;
+                padding: 15px;
+            }
+
+            #accessCode {
+                width: 80%;
+            }
+        }
+
+        .tab-buttons {
+            margin-bottom: 20px;
+        }
+
+        .tab-button {
+            background-color: #f0f0f0;
+            color: #333;
+            border: none;
+            padding: 10px 20px;
+            margin: 0 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .tab-button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎤 음성 메시지 녹음</h1>
+        <h1>🎤 음성 메시지</h1>
         
-        <div id="timer">00:00</div>
-        
-        <div>
-            <button id="recordButton" class="button">녹음 시작</button>
-            <button id="stopButton" class="button" disabled>녹음 중지</button>
+        <div class="tab-buttons">
+            <button class="tab-button active" onclick="showTab('record')">녹음하기</button>
+            <button class="tab-button" onclick="showTab('upload')">파일 업로드</button>
+        </div>
+
+        <div id="recordTab" class="tab-content active">
+            <div id="timer">00:00</div>
+            
+            <div>
+                <button id="recordButton" class="button">녹음 시작</button>
+                <button id="stopButton" class="button" disabled>녹음 중지</button>
+            </div>
+
+            <audio id="audioPlayback" controls style="display: none; width: 100%; margin: 10px 0;"></audio>
+        </div>
+
+        <div id="uploadTab" class="tab-content">
+            <div class="file-upload-box">
+                <button id="uploadButton" class="button upload-button">파일 선택</button>
+                <input type="file" id="fileInput" accept="audio/*" style="display: none;">
+                <div id="fileName" class="status"></div>
+            </div>
         </div>
 
         <div>
@@ -75,25 +161,46 @@
         </div>
 
         <div id="status" class="status"></div>
-
-        <audio id="audioPlayback" controls style="display: none;"></audio>
     </div>
 
-    <script src="https://apis.google.com/js/api.js"></script>
     <script>
-        // 여기에 YOUR_CLIENT_ID를 실제 Google Cloud Console에서 받은 클라이언트 ID로 교체하세요
-        const CLIENT_ID = '402792213720-28p6phnbcgr26dnqst191k92rnnfsihu.apps.googleusercontent.com';
-        const API_KEY = 'AIzaSyDn9NKes15tmdIdbGW_ilp7ag39huWK-Bc';
-
         let mediaRecorder;
         let audioChunks = [];
         let timer;
         let seconds = 0;
         let isRecording = false;
+        let selectedFile = null;
 
+        // 탭 전환
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // 녹음 관련 이벤트 리스너
         document.getElementById('recordButton').addEventListener('click', startRecording);
         document.getElementById('stopButton').addEventListener('click', stopRecording);
         document.getElementById('saveButton').addEventListener('click', saveRecording);
+
+        // 파일 업로드 관련 이벤트 리스너
+        document.getElementById('uploadButton').addEventListener('click', () => {
+            document.getElementById('fileInput').click();
+        });
+
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectedFile = file;
+                document.getElementById('fileName').textContent = file.name;
+                document.getElementById('saveButton').disabled = false;
+                updateStatus('파일이 선택되었습니다.');
+            }
+        }
 
         async function startRecording() {
             try {
@@ -111,6 +218,7 @@
                     document.getElementById('audioPlayback').src = audioUrl;
                     document.getElementById('audioPlayback').style.display = 'block';
                     document.getElementById('saveButton').disabled = false;
+                    selectedFile = new File([audioBlob], 'recording.wav', { type: 'audio/wav' });
                 };
 
                 mediaRecorder.start();
@@ -122,7 +230,7 @@
                 updateStatus('녹음 중...');
             } catch (err) {
                 console.error('Error accessing microphone:', err);
-                updateStatus('마이크 접근 오류');
+                updateStatus('마이크 접근 오류. 권한을 확인해주세요.');
             }
         }
 
@@ -162,9 +270,14 @@
                 return;
             }
 
-            // 여기에 Google Drive 업로드 코드 구현
+            if (!selectedFile) {
+                updateStatus('녹음이나 파일을 선택해주세요');
+                return;
+            }
+
+            // 여기에 실제 저장 로직 구현 필요
             updateStatus('저장 중...');
-            // 실제 저장 로직 구현 필요
+            // FormData를 사용한 파일 업로드 구현 필요
         }
     </script>
 </body>

@@ -40,12 +40,13 @@
     <p id="status"></p>
     
     <script>
+        let audioContext;
         let mediaRecorder;
         let audioChunks = [];
         let isRecording = false;
         let timerInterval;
         let seconds = 0;
-        
+
         function startTimer() {
             seconds = 0;
             document.getElementById("timer").textContent = "0초";
@@ -54,45 +55,73 @@
                 document.getElementById("timer").textContent = seconds + "초";
             }, 1000);
         }
-        
+
         function stopTimer() {
             clearInterval(timerInterval);
             document.getElementById("timer").textContent = "";
         }
-        
-        document.getElementById("recordButton").addEventListener("click", async function() {
-            if (!isRecording) {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream);
-                    audioChunks = [];
-                    
-                    mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
-                    mediaRecorder.onstop = () => {
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
-                        const audioUrl = URL.createObjectURL(audioBlob);
-                        document.getElementById("audioPlayer").src = audioUrl;
-                        document.getElementById("audioPlayer").style.display = "block";
-                        document.getElementById("audioPlayer").play();
-                    };
-                    
-                    mediaRecorder.start();
-                    startTimer();
-                    isRecording = true;
-                    this.textContent = "녹음 중지";
-                    this.classList.add("recording");
-                } catch (error) {
-                    alert("마이크 접근을 허용해주세요.");
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    await audioContext.resume();
                 }
-            } else {
+
+                mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = async () => {
+                    if (audioChunks.length === 0) {
+                        alert("녹음된 오디오가 없습니다. 다시 시도해 주세요.");
+                        return;
+                    }
+
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    document.getElementById("audioPlayer").src = audioUrl;
+                    document.getElementById("audioPlayer").style.display = "block";
+                    document.getElementById("audioPlayer").play();
+                    console.log("녹음 완료, 파일 크기:", audioBlob.size, "bytes");
+                };
+
+                mediaRecorder.start();
+                startTimer();
+                isRecording = true;
+                document.getElementById("recordButton").textContent = "녹음 중지";
+                document.getElementById("recordButton").classList.add("recording");
+            } catch (error) {
+                alert("마이크 접근을 허용해주세요.");
+                console.error("녹음 오류:", error);
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
                 mediaRecorder.stop();
-                stopTimer();
-                isRecording = false;
-                this.textContent = "녹음 시작";
-                this.classList.remove("recording");
+            }
+            stopTimer();
+            isRecording = false;
+            document.getElementById("recordButton").textContent = "녹음 시작";
+            document.getElementById("recordButton").classList.remove("recording");
+        }
+
+        document.getElementById("recordButton").addEventListener("click", function() {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
             }
         });
-        
+
         document.getElementById("fileInput").addEventListener("change", function(event) {
             const file = event.target.files[0];
             if (file) {
@@ -106,26 +135,6 @@
                 document.getElementById("audioPlayer").style.display = "block";
                 document.getElementById("audioPlayer").play();
             }
-        });
-        
-        document.getElementById("accessCode").addEventListener("input", function() {
-            document.getElementById("saveButton").disabled = this.value.trim() === "";
-        });
-        
-        document.getElementById("saveButton").addEventListener("click", function() {
-            const accessCode = document.getElementById("accessCode").value.trim();
-            if (!accessCode) {
-                alert("액세스 코드를 입력하세요.");
-                return;
-            }
-            const statusElem = document.getElementById("status");
-            statusElem.textContent = "저장 중...";
-            setTimeout(() => {
-                statusElem.textContent = "저장되었습니다.";
-                setTimeout(() => {
-                    statusElem.textContent = "";
-                }, 2000);
-            }, 1000);
         });
     </script>
 </body>

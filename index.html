@@ -40,7 +40,6 @@
     <p id="status"></p>
     
     <script>
-        let audioContext;
         let mediaRecorder;
         let audioChunks = [];
         let isRecording = false;
@@ -65,24 +64,16 @@
             if (!isRecording) {
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    const source = audioContext.createMediaStreamSource(stream);
-                    
                     mediaRecorder = new MediaRecorder(stream);
                     audioChunks = [];
                     
                     mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
-                    mediaRecorder.onstop = async () => {
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
                         const audioUrl = URL.createObjectURL(audioBlob);
-                        
-                        const audioPlayer = document.getElementById("audioPlayer");
-                        if (audioPlayer.src) {
-                            URL.revokeObjectURL(audioPlayer.src);
-                        }
-                        audioPlayer.src = audioUrl;
-                        audioPlayer.style.display = "block";
-                        audioPlayer.play();
+                        document.getElementById("audioPlayer").src = audioUrl;
+                        document.getElementById("audioPlayer").style.display = "block";
+                        document.getElementById("audioPlayer").play();
                     };
                     
                     mediaRecorder.start();
@@ -109,16 +100,11 @@
                     alert("파일 크기가 5MB를 초과할 수 없습니다.");
                     return;
                 }
-                
                 document.getElementById("fileName").textContent = "파일 선택됨: " + file.name;
-                const audioPlayer = document.getElementById("audioPlayer");
-                if (audioPlayer.src) {
-                    URL.revokeObjectURL(audioPlayer.src);
-                }
                 const audioUrl = URL.createObjectURL(file);
-                audioPlayer.src = audioUrl;
-                audioPlayer.style.display = "block";
-                audioPlayer.play();
+                document.getElementById("audioPlayer").src = audioUrl;
+                document.getElementById("audioPlayer").style.display = "block";
+                document.getElementById("audioPlayer").play();
             }
         });
         
